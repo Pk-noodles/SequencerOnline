@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Codon Reader — DNA Tools</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+
+  :root{
+    --bg:            #0e1b1e;
+    --bg-grid:       #10201f;
+    --panel:         #16292c;
+    --panel-2:       #132226;
+    --border:        #24403f;
+    --border-soft:   #1c3234;
+    --text:          #e7ede7;
+    --text-muted:    #8fa69e;
+    --text-dim:      #5a6b68;
+
+    --accent:        #e8a33d;   /* amber — UI accent / CTA */
+    --accent-dim:    #6b552b;
+    --phosphor:      #5ee6a0;   /* green — matches / polar aa */
+    --violet:        #9b8cff;   /* positive aa */
+    --coral:         #ff6b6b;   /* negative aa */
+
+    --font-display:  'Space Grotesk', sans-serif;
+    --font-body:      'Inter', sans-serif;
+    --font-mono:       'JetBrains Mono', monospace;
+  }
+
+  *{ box-sizing: border-box; }
+
+  body{
+    margin:0;
+    background:
+      radial-gradient(ellipse 900px 500px at 50% -10%, rgba(94,230,160,0.06), transparent),
+      repeating-linear-gradient(0deg, var(--bg-grid) 0px, var(--bg-grid) 1px, var(--bg) 1px, var(--bg) 28px),
+      var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    line-height: 1.5;
+    min-height: 100vh;
+    padding: 48px 20px 80px;
+  }
+
+  .wrap{
+    max-width: 760px;
+    margin: 0 auto;
+  }
+
+  /* ---------- Header ---------- */
+
+  header{
+    margin-bottom: 36px;
+  }
+
+  .eyebrow{
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--phosphor);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .eyebrow::before{
+    content: "";
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--phosphor);
+    box-shadow: 0 0 10px var(--phosphor);
+    display: inline-block;
+  }
+
+  h1{
+    font-family: var(--font-display);
+    font-size: 40px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin: 0 0 10px;
+  }
+
+  header p{
+    color: var(--text-muted);
+    max-width: 480px;
+    margin: 0;
+    font-size: 15px;
+  }
+
+  /* ---------- Tabs ---------- */
+
+  .tabs{
+    display: flex;
+    gap: 6px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 5px;
+    margin-bottom: 24px;
+    width: fit-content;
+  }
+
+  .tab{
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 14px;
+    letter-spacing: 0.01em;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    padding: 10px 20px;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+
+  .tab:hover{ color: var(--text); }
+
+  .tab.is-active{
+    background: var(--accent);
+    color: #1a1207;
+  }
+
+  /* ---------- Panels ---------- */
+
+  .panel{
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 28px;
+    display: none;
+  }
+
+  .panel.is-active{ display: block; }
+
+  .panel + .panel{ margin-top: 0; }
+
+  .field{ margin-bottom: 18px; }
+
+  .field label{
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+  }
+
+  textarea, input[type="text"]{
+    width: 100%;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 15px;
+    letter-spacing: 0.03em;
+    padding: 12px 14px;
+    resize: vertical;
+    transition: border-color 0.15s ease;
+  }
+
+  textarea{ min-height: 84px; }
+
+  textarea:focus, input[type="text"]:focus{
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  textarea::placeholder, input::placeholder{
+    color: var(--text-dim);
+  }
+
+  .row{
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  @media (max-width: 560px){
+    .row{ grid-template-columns: 1fr; }
+  }
+
+  /* Segmented algorithm choice */
+
+  .segmented{
+    display: flex;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .segmented input{ display: none; }
+
+  .segmented label{
+    flex: 1;
+    text-align: center;
+    padding: 11px 10px;
+    font-family: var(--font-body);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-muted);
+    cursor: pointer;
+    background: var(--panel-2);
+    transition: background 0.15s ease, color 0.15s ease;
+    text-transform: none;
+  }
+
+  .segmented label + label{ border-left: 1px solid var(--border); }
+
+  .segmented input:checked + label{
+    background: var(--accent-dim);
+    color: var(--accent);
+  }
+
+  button.submit{
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 14px;
+    background: var(--accent);
+    color: #1a1207;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 22px;
+    cursor: pointer;
+    margin-top: 6px;
+    transition: filter 0.15s ease;
+  }
+
+  button.submit:hover{ filter: brightness(1.08); }
+
+  .error{
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--coral);
+    margin: -4px 0 16px;
+  }
+
+  /* ---------- Results: shared "readout" styling ---------- */
+
+  .result{
+    margin-top: 26px;
+    padding-top: 22px;
+    border-top: 1px dashed var(--border-soft);
+  }
+
+  .result-label{
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 10px;
+  }
+
+  /* Codon trace (translate output) */
+
+  .trace{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    margin-bottom: 18px;
+  }
+
+  .codon-block{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 42px;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid var(--border-soft);
+  }
+
+  .codon-block .codon{
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    background: var(--panel-2);
+    padding: 4px 6px;
+    letter-spacing: 0.03em;
+  }
+
+  .codon-block .aa{
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: 16px;
+    padding: 6px 0;
+    text-align: center;
+    color: #0e1b1e;
+  }
+
+  .aa-nonpolar .aa{ background: var(--accent); }
+  .aa-polar .aa{ background: var(--phosphor); }
+  .aa-positive .aa{ background: var(--violet); }
+  .aa-negative .aa{ background: var(--coral); }
+  .aa-stop .aa{ background: var(--text-dim); color: var(--bg); }
+  .aa-unknown .aa{ background: transparent; color: var(--text-dim); border: 1px dashed var(--border); }
+
+  .legend{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  .legend span{
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .legend i{
+    width: 10px; height: 10px;
+    border-radius: 2px;
+    display: inline-block;
+  }
+
+  .legend .sw-nonpolar{ background: var(--accent); }
+  .legend .sw-polar{ background: var(--phosphor); }
+  .legend .sw-positive{ background: var(--violet); }
+  .legend .sw-negative{ background: var(--coral); }
+  .legend .sw-stop{ background: var(--text-dim); }
+
+  .protein-string{
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--text-muted);
+    word-break: break-all;
+    margin-top: 14px;
+  }
+
+  .protein-string b{
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  /* Alignment viewer */
+
+  .align-viewer{
+    font-family: var(--font-mono);
+    font-size: 15px;
+    line-height: 1.9;
+    letter-spacing: 0.02em;
+    word-break: break-all;
+    margin-bottom: 16px;
+  }
+
+  .align-row{ display: block; white-space: pre-wrap; }
+
+  .align-viewer .ch{
+    padding: 1px 2px;
+    border-radius: 3px;
+  }
+
+  .align-match{ color: var(--phosphor); }
+  .align-mismatch{ color: var(--accent); background: rgba(232,163,61,0.12); }
+  .align-gap{ color: var(--text-dim); }
+
+  .score-badge{
+    display: inline-flex;
+    align-items: baseline;
+    gap: 8px;
+    font-family: var(--font-mono);
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 14px;
+  }
+
+  .score-badge .num{
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--phosphor);
+  }
+
+  .score-badge .lbl{
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+  }
+
+  footer{
+    text-align: center;
+    margin-top: 40px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 0.04em;
+  }
+
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">Sequencer online</div>
+    <h1>Codon Reader</h1>
+    <p>Translate raw DNA into protein, or line up two sequences to see where they agree.</p>
+  </header>
+
+  <nav class="tabs">
+    <button type="button" class="tab {{ 'is-active' if active_tab == 'translate' else '' }}" data-target="translate-panel">Translate</button>
+    <button type="button" class="tab {{ 'is-active' if active_tab == 'align' else '' }}" data-target="align-panel">Align</button>
+  </nav>
+
+  <!-- ===================== TRANSLATE ===================== -->
+  <section class="panel {{ 'is-active' if active_tab == 'translate' else '' }}" id="translate-panel">
+
+    <form action="/translate" method="post">
+      <div class="field">
+        <label for="dna_sequence">DNA sequence</label>
+        <textarea id="dna_sequence" name="dna_sequence" placeholder="ATGGCCATTGTAATGGGCCGCTGAAAGGGTGCCCGATAG">{{ dna_sequence or '' }}</textarea>
+      </div>
+
+      {% if translate_error %}
+        <div class="error">{{ translate_error }}</div>
+      {% endif %}
+
+      <button type="submit" class="submit">Translate sequence</button>
+    </form>
+
+    {% if protein_sequence is not none %}
+    <div class="result">
+      <div class="result-label">Reading frame</div>
+
+      <div class="trace">
+        {% for c in codon_trace %}
+          <div class="codon-block {{ c.cls }}">
+            <div class="codon">{{ c.codon }}</div>
+            <div class="aa">{{ c.aa }}</div>
+          </div>
+        {% endfor %}
+      </div>
+
+      <div class="legend">
+        <span><i class="sw-nonpolar"></i> Nonpolar</span>
+        <span><i class="sw-polar"></i> Polar</span>
+        <span><i class="sw-positive"></i> Positive</span>
+        <span><i class="sw-negative"></i> Negative</span>
+        <span><i class="sw-stop"></i> Stop</span>
+      </div>
+
+      <div class="protein-string">Protein &mdash; <b>{{ protein_sequence }}</b></div>
+    </div>
+    {% endif %}
+
+  </section>
+
+  <!-- ===================== ALIGN ===================== -->
+  <section class="panel {{ 'is-active' if active_tab == 'align' else '' }}" id="align-panel">
+
+    <form action="/align" method="post">
+      <div class="row">
+        <div class="field">
+          <label for="seq_a">Sequence A</label>
+          <input type="text" id="seq_a" name="seq_a" placeholder="GATTACA" value="{{ seq_a or '' }}">
+        </div>
+        <div class="field">
+          <label for="seq_b">Sequence B</label>
+          <input type="text" id="seq_b" name="seq_b" placeholder="GCATGCU" value="{{ seq_b or '' }}">
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Algorithm</label>
+        <div class="segmented">
+          <input type="radio" id="alg-nw" name="algorithm" value="nw" {{ 'checked' if (algorithm or 'nw') == 'nw' else '' }}>
+          <label for="alg-nw">Global &mdash; Needleman-Wunsch</label>
+
+          <input type="radio" id="alg-sw" name="algorithm" value="sw" {{ 'checked' if algorithm == 'sw' else '' }}>
+          <label for="alg-sw">Local &mdash; Smith-Waterman</label>
+        </div>
+      </div>
+
+      {% if align_error %}
+        <div class="error">{{ align_error }}</div>
+      {% endif %}
+
+      <button type="submit" class="submit">Align sequences</button>
+    </form>
+
+    {% if alignment_pairs %}
+    <div class="result">
+      <div class="result-label">Alignment</div>
+
+      <div class="align-viewer">
+        <span class="align-row">
+          {% for p in alignment_pairs %}<span class="ch {{ p.cls }}">{{ p.a }}</span>{% endfor %}
+        </span>
+        <span class="align-row">
+          {% for p in alignment_pairs %}<span class="ch {{ p.cls }}">{{ p.b }}</span>{% endfor %}
+        </span>
+      </div>
+
+      <div class="legend" style="margin-bottom:16px;">
+        <span><i style="background:var(--phosphor)"></i> Match</span>
+        <span><i style="background:var(--accent)"></i> Mismatch</span>
+        <span><i style="background:var(--text-dim)"></i> Gap</span>
+      </div>
+
+      <div class="score-badge">
+        <span class="num">{{ score }}</span>
+        <span class="lbl">Score</span>
+      </div>
+    </div>
+    {% endif %}
+
+  </section>
+
+  <footer>genetic_code &middot; needleman&ndash;wunsch &middot; smith&ndash;waterman</footer>
+
+</div>
+
+<script>
+  const tabs = document.querySelectorAll('.tab');
+  const panels = document.querySelectorAll('.panel');
+
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      tabs.forEach(t => t.classList.remove('is-active'));
+      panels.forEach(p => p.classList.remove('is-active'));
+      tab.classList.add('is-active');
+      document.getElementById(tab.dataset.target).classList.add('is-active');
+    });
+  });
+</script>
+
+</body>
+</html>
